@@ -1,0 +1,90 @@
+CompileFlags:
+  Add: ["-Wall", "-Wextra", "-Wno-xor-used-as-pow", "-DCPLIB_CLANGD=1"]
+
+Diagnostics:
+  UnusedIncludes: Strict
+  MissingIncludes: Strict
+
+---
+If:
+  PathMatch: .*\.98\.(cpp|hpp)$
+CompileFlags:
+  Add: ["-xc++", "-std=c++98"]
+
+---
+If:
+  PathMatch: .*\.03\.(cpp|hpp)$
+CompileFlags:
+  Add: ["-xc++", "-std=c++03"]
+
+---
+If:
+  PathMatch: .*\.11\.(cpp|hpp)$
+CompileFlags:
+  Add: ["-xc++", "-std=c++11"]
+
+---
+If:
+  PathMatch: .*\.14\.(cpp|hpp)$
+CompileFlags:
+  Add: ["-xc++", "-std=c++14"]
+
+---
+If:
+  PathMatch: .*\.17\.(cpp|hpp)$
+CompileFlags:
+  Add: ["-xc++", "-std=c++17"]
+
+---
+If:
+  PathMatch: .*\.20\.(cpp|hpp)$
+CompileFlags:
+  Add: ["-xc++", "-std=c++20"]
+
+---
+If:
+  PathMatch: .*\.23\.(cpp|hpp)$
+CompileFlags:
+  Add: ["-xc++", "-std=c++23"]
+
+---
+If:
+  PathMatch: .*\.89\.(c|h)$
+CompileFlags:
+  Add: ["-xc", "-std=c89"]
+
+---
+If:
+  PathMatch: .*\.90\.(c|h)$
+CompileFlags:
+  Add: ["-xc", "-std=c90"]
+
+---
+If:
+  PathMatch: .*\.99\.(c|h)$
+CompileFlags:
+  Add: ["-xc", "-std=c99"]
+
+---
+If:
+  PathMatch: .*\.11\.(c|h)$
+CompileFlags:
+  Add: ["-xc", "-std=c11"]
+
+---
+If:
+  PathMatch: .*\.17\.(c|h)$
+CompileFlags:
+  Add: ["-xc", "-std=c17"]
+
+---
+If:
+  PathMatch: .*\.18\.(c|h)$
+CompileFlags:
+  Add: ["-xc", "-std=c18"]
+
+---
+If:
+  PathMatch: .*\.23\.(c|h)$
+CompileFlags:
+  Add: ["-xc", "-std=c23"]

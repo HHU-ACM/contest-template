@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "skills": {
+    "author-hull-problems": {
+      "source": "hull.aberter0x3f.top",
+      "sourceUrl": "https://hull.aberter0x3f.top/",
+      "sourceType": "well-known",
+      "computedHash": "f791085c23f39282daf3cdc6133562a077e4522a45f577a8b2a102b8bc29a879",
+      "wellKnownDigest": "sha256:eec9f10bd9b6ef7f23fdcabf628dacb7db2c3fceba3da0ce463a34c1df614958"
+    },
+    "documentation": {
+      "source": "hull.aberter0x3f.top",
+      "sourceUrl": "https://hull.aberter0x3f.top/",
+      "sourceType": "well-known",
+      "computedHash": "9fee28670776c0dee88888492f7f53e88d7096f2d632418bd623ba1316af97b3",
+      "wellKnownDigest": "sha256:15e279f4cc57e8f13bf573c005b090a1ecbcbc5d731d1213893d7de4b3f31452"
+    }
+  }
+}

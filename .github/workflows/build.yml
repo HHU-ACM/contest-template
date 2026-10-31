@@ -1,0 +1,137 @@
+name: Build Hull outputs
+
+on:
+  workflow_call:
+    inputs:
+      revision:
+        type: string
+        required: true
+      full:
+        type: boolean
+        required: true
+      problems:
+        type: string
+        default: '[]'
+      statements:
+        type: boolean
+        default: true
+    secrets:
+      CACHIX_AUTH_TOKEN:
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.revision }}
+          persist-credentials: false
+      - name: Record source commit
+        id: source
+        run: |
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          echo "HULL_WASMTIME_CACHE_DIR=$RUNNER_TEMP/hull-cwasm" >> "$GITHUB_ENV"
+      - uses: cachix/install-nix-action@v31
+      - name: Use public Cachix cache
+        if: ${{ vars.CACHIX_CACHE != '' }}
+        uses: cachix/cachix-action@38b082610b782e7e93e209c35fd730d399dee866 # v17
+        with:
+          name: ${{ vars.CACHIX_CACHE }}
+          authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
+          skipPush: ${{ secrets.CACHIX_AUTH_TOKEN == '' }}
+      - name: Restore Nix store cache (default)
+        if: ${{ vars.CACHIX_CACHE == '' }}
+        uses: nix-community/cache-nix-action@v7
+        with:
+          primary-key: hull-v2-${{ runner.os }}-${{ hashFiles('flake.lock') }}-${{ steps.source.outputs.sha }}
+          restore-prefixes-first-match: |
+            hull-v2-${{ runner.os }}-${{ hashFiles('flake.lock') }}-
+            hull-${{ runner.os }}-
+          gc-max-store-size-linux: 12G
+      - name: Evaluate the locked flake
+        run: nix flake check --no-build --no-update-lock-file
+      - name: Check formatting
+        run: nix fmt -- --ci
+      - name: Build statement booklet
+        if: ${{ inputs.statements }}
+        run: nix build .#contest-statements -o result-statements
+      - name: Render standalone statement previews without judging
+        if: ${{ inputs.statements && !inputs.full }}
+        run: nix build .#statement-previews -o result-previews
+      - name: Keep the build environment rooted
+        if: ${{ inputs.full || inputs.problems != '[]' }}
+        run: nix develop --profile "$RUNNER_TEMP/hull-ci-env" --command true
+      - name: Restore compiled Wasmtime modules
+        if: ${{ inputs.full || inputs.problems != '[]' }}
+        id: wasm-cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ env.HULL_WASMTIME_CACHE_DIR }}
+          key: hull-cwasm-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('flake.lock') }}-${{ steps.source.outputs.sha }}
+          restore-keys: |
+            hull-cwasm-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('flake.lock') }}-
+      - name: Build and verify the complete contest
+        if: ${{ inputs.full }}
+        run: |
+          nix develop --command hull build-contest -t ci -o result-ci --interactive never
+          ln -sfn result-ci/internal result-contest
+          ln -sfn result-ci/hydro result-hydro
+      - name: Verify affected problems
+        if: ${{ !inputs.full && inputs.problems != '[]' }}
+        env:
+          PROBLEMS: ${{ inputs.problems }}
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          import subprocess
+          for slug in json.loads(os.environ["PROBLEMS"]):
+              subprocess.run([
+                  "nix", "develop", "--command", "hull", "build", "-p", slug,
+                  "-o", f"result-{slug}", "--interactive", "never",
+              ], check=True)
+          PY
+      - name: Package verified outputs
+        if: ${{ inputs.full && github.event.repository.private }}
+        env:
+          SOURCE_SHA: ${{ steps.source.outputs.sha }}
+        run: |
+          mkdir -p dist/hydro
+          cp -L result-statements dist/statements.pdf
+          tar -czhf dist/contest-internal.tar.gz -C result-contest .
+          for package in result-hydro/*; do
+            cp -L "$package" "dist/hydro/$(basename "$package").zip"
+          done
+          chmod -R u+w dist
+          python3 - <<'PY'
+          import hashlib
+          import json
+          import os
+          from pathlib import Path
+          root = Path("dist")
+          files = {
+              str(path.relative_to(root)): hashlib.sha256(path.read_bytes()).hexdigest()
+              for path in sorted(root.rglob("*")) if path.is_file()
+          }
+          (root / "manifest.json").write_text(json.dumps({
+              "source_sha": os.environ["SOURCE_SHA"], "files": files,
+          }, indent=2) + "\n")
+          PY
+      - name: Upload verified outputs
+        if: ${{ inputs.full && github.event.repository.private }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: contest-packages-${{ steps.source.outputs.sha }}
+          path: dist
+          if-no-files-found: error
+          retention-days: 14
+      - name: Save compiled Wasmtime modules from trusted builds
+        if: ${{ success() && github.event_name != 'pull_request' && (inputs.full || inputs.problems != '[]') && steps.wasm-cache.outputs.cache-hit != 'true' }}
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ env.HULL_WASMTIME_CACHE_DIR }}
+          key: ${{ steps.wasm-cache.outputs.cache-primary-key }}
