@@ -6,3 +6,25 @@
     + str(memory-mib)
     + " MB])]\n\n"
 )
+
+// Convert one Hull problem overview to an olymp-in-typst entry.
+#let problem-entry(data, section) = (
+  problem: (
+    display_name: data.display_name.zh,
+    format: "markup",
+    samples: data.samples.map(sample => (
+      input: sample.input.trim(),
+      output: sample.outputs.output.trim(),
+    )),
+  ),
+  statement: (
+    description: metadata-string(
+      data.tick_limit / 10000000000,
+      data.memory_limit / 1048576,
+    )
+      + section("description"),
+    input: section("input"),
+    output: section("output"),
+    notes: section("note"),
+  ),
+)

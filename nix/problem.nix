@@ -1,16 +1,5 @@
-{
-  directory,
-  name,
-  title,
-  timeLimitMs,
-  memoryLimitMb,
-  solutions,
-  invalidInput,
-  generators ? { },
-  extraValidatorTests ? { },
-  extraCheckerTests ? { },
-  extraTestCases ? { },
-}:
+# Shared defaults for a batch problem; problem.nix can override any of them.
+directory:
 {
   hull,
   pkgs,
@@ -20,73 +9,34 @@
   ...
 }:
 let
+  documents = import ./documents.nix { inherit hull pkgs; };
   readCases =
-    group: folder:
-    lib.mapAttrs'
-      (file: _: {
-        name = "${group}${lib.removeSuffix ".in" file}";
-        value = {
-          inputFile = directory + "/data/${folder}/${file}";
-          groups = lib.optional (group == "sample") "sample";
-        };
-      })
-      (
-        lib.filterAttrs (file: kind: kind == "regular" && lib.hasSuffix ".in" file) (
-          builtins.readDir (directory + "/data/${folder}")
-        )
+    prefix: folder: groups:
+    let
+      path = directory + "/data/${folder}";
+      inputs = lib.filterAttrs (file: _: lib.hasSuffix ".in" file) (
+        lib.optionalAttrs (builtins.pathExists path) (builtins.readDir path)
       );
+    in
+    lib.mapAttrs' (file: _: {
+      name = "${prefix}${lib.removeSuffix ".in" file}";
+      value = {
+        inputFile = path + "/${file}";
+        inherit groups;
+      };
+    }) inputs;
 in
 {
-  inherit name solutions generators;
-  displayName.zh = title;
-  tickLimit = timeLimitMs * 10000000;
-  memoryLimit = memoryLimitMb * 1024 * 1024;
+  name = lib.mkDefault (baseNameOf directory);
   authoringIncludes = [
     cplib
-    ../authoring-include
     (directory + "/authoring-include")
   ];
-  validator = {
-    src = directory + "/validator.23.cpp";
-    tests = {
-      sample = {
-        inputFile = directory + "/data/samples/01.in";
-        prediction = { status, ... }: status == "valid";
-      };
-      invalid = {
-        inputFile = builtins.toFile "${name}-invalid.in" invalidInput;
-        prediction = { status, ... }: status == "invalid";
-      };
-      trailing = {
-        inputFile = builtins.toFile "${name}-trailing.in" (
-          (builtins.readFile (directory + "/data/samples/01.in")) + "EXTRA\n"
-        );
-        prediction = { status, ... }: status == "invalid";
-      };
-    }
-    // extraValidatorTests;
-  };
-  checker = {
-    src = directory + "/checker.23.cpp";
-    tests = {
-      sample = {
-        inputFile = directory + "/data/samples/01.in";
-        outputFile = directory + "/data/samples/01.out";
-        prediction = { status, ... }: status == "accepted";
-      };
-      extraOutput = {
-        inputFile = directory + "/data/samples/01.in";
-        outputFile = builtins.toFile "${name}-extra.out" (
-          (builtins.readFile (directory + "/data/samples/01.out")) + " EXTRA\n"
-        );
-        prediction = { status, ... }: status == "wrong_answer";
-      };
-    }
-    // extraCheckerTests;
-  };
-  testCases = (readCases "sample" "samples") // (readCases "test" "tests") // extraTestCases;
+  validator.src = lib.mkDefault (directory + "/validator.23.cpp");
+  checker.src = lib.mkDefault (directory + "/checker.23.cpp");
+  testCases = readCases "sample" "samples" [ "sample" ] // readCases "test" "tests" [ ];
   # Samples precede test cases; scores are summed across cases.
-  subtasks = [
+  subtasks = lib.mkDefault [
     {
       fullScore = 1.0;
       scoringMethod = "sum";
@@ -94,20 +44,12 @@ in
   ];
   documents = {
     "statement.zh.pdf" = {
-      path = import ./statement.nix {
-        inherit hull pkgs config;
-        src = directory + "/document/statement";
-      };
+      path = documents.statement config directory;
       displayLanguage = "zh";
       participantVisibility = true;
     };
-  }
-  // lib.optionalAttrs (builtins.pathExists (directory + "/document/editorial/zh.typ")) {
     "editorial.zh.pdf" = {
-      path = import ./editorial.nix {
-        inherit hull pkgs config;
-        src = directory + "/document/editorial";
-      };
+      path = documents.editorial config directory;
       displayLanguage = "zh";
       participantVisibility = false;
     };
@@ -118,11 +60,7 @@ in
       statements.zh = "statement.zh.pdf";
       defaultDisplayLanguage = "zh";
       testDataExtraFiles."problem.23.hpp" = directory + "/authoring-include/problem.23.hpp";
-      testDataExtraFiles."normalized_text.23.hpp" = ../authoring-include/normalized_text.23.hpp;
-      judgeExtraFiles = [
-        "problem.23.hpp"
-        "normalized_text.23.hpp"
-      ];
+      judgeExtraFiles = [ "problem.23.hpp" ];
     };
   };
 }

@@ -1,13 +1,5 @@
-__pycache__/
-*.py[cod]
-.venv/
-.pytest_cache/
-*.exe
 *.o
-*.obj
-*.class
 .build/
+.hull/
 result
 result-*
-.hull/
-dist/

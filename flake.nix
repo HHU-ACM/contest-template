@@ -31,44 +31,26 @@
         "aarch64-darwin"
       ];
       eachSystem = nixpkgs.lib.genAttrs systems;
-      # contest.nix owns the problem list and its order.
-      problemPaths = builtins.listToAttrs (
-        map (path: {
-          name = baseNameOf (dirOf path);
-          value = path;
-        }) (import ./contest.nix { hull = null; }).problems
-      );
+      contests = eachSystem (system: hull.lib.${system}.evalContest ./contest.nix { });
     in
     {
+      # contest.nix owns the problem list and its order.
       hullProblems = eachSystem (
-        system: builtins.mapAttrs (_: path: hull.lib.${system}.evalProblem path { }) problemPaths
+        system:
+        builtins.listToAttrs (
+          map (problem: {
+            inherit (problem.config) name;
+            value = problem;
+          }) contests.${system}.config.problems
+        )
       );
       hullContests = eachSystem (system: {
-        default = hull.lib.${system}.evalContest ./contest.nix { };
-      });
-      packages = eachSystem (system: {
-        statement-previews = nixpkgs.legacyPackages.${system}.linkFarm "statement-previews" (
-          map (slug: {
-            name = "${slug}.pdf";
-            path = import ./nix/contest-statement.nix {
-              pkgs = nixpkgs.legacyPackages.${system};
-              typixLib = hull.inputs.typix.lib.${system};
-              inherit slug;
-            };
-          }) (builtins.attrNames problemPaths)
-        );
-        contest-statements = import ./nix/contest-statement.nix {
-          pkgs = nixpkgs.legacyPackages.${system};
-          typixLib = hull.inputs.typix.lib.${system};
-        };
+        default = contests.${system};
       });
       devShells = eachSystem (system: {
         default = nixpkgs.legacyPackages.${system}.mkShell {
           packages = [
             hull.packages.${system}.default
-            nixpkgs.legacyPackages.${system}.python3
-            nixpkgs.legacyPackages.${system}.gcc
-            nixpkgs.legacyPackages.${system}.just
           ];
           CPLUS_INCLUDE_PATH = toString cplib;
         };
